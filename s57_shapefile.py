@@ -41,6 +41,11 @@ except:
         sys.exit( 1 )
 
 feature_classes = {}
+excluded_fields = [
+    'RCID', 'PRIM', 'GRUP', 'OBJL', 'RVER', 'AGEN',
+    'FIDN', 'FIDS', 'LNAM', 'LNAM_REFS', 'FFPT_RIND',
+    'RECIND', 'RECDAT', 'SCAMAX'
+]
 
 # output CS in WGS84
 output_srs = osr.SpatialReference()
@@ -125,13 +130,16 @@ def create_fields(src_layer, dst_layer):
     lyr_defn = src_layer.GetLayerDefn()
     for i in range( lyr_defn.GetFieldCount() ):
         field = lyr_defn.GetFieldDefn( i )
+        field_name = field.GetNameRef()
+        if field_name in excluded_fields:
+           continue
         type = field.GetType()
         if type == ogr.OFTStringList or \
             type == ogr.OFTIntegerList or \
             type == ogr.OFTRealList or \
             type == ogr.OFTBinary:
             type = ogr.OFTString
-        new = ogr.FieldDefn( field.GetNameRef(), type )
+        new = ogr.FieldDefn( field_name, type )
         new.SetWidth( field.GetWidth() )
         new.SetPrecision( field.GetPrecision() )
         dst_layer.CreateField( new )
@@ -228,3 +236,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
