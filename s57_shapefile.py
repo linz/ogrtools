@@ -29,7 +29,7 @@ import argparse
 __author__ = 'Jeremy Palmer'
 __date__ = 'February 2013'
 __copyright__ = '2013 Crown copyright (c)'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 try:
     from osgeo import ogr, osr, gdal
@@ -126,7 +126,7 @@ def read_datasets( files ):
         datasets.append( ds )
     return datasets
 
-def create_fields(src_layer, dst_layer):
+def create_fields(src_layer, dst_layer, convert_to_real):
     lyr_defn = src_layer.GetLayerDefn()
     for i in range( lyr_defn.GetFieldCount() ):
         field = lyr_defn.GetFieldDefn( i )
@@ -134,6 +134,8 @@ def create_fields(src_layer, dst_layer):
         if field_name in excluded_fields:
            continue
         type = field.GetType()
+        if convert_to_real and type == ogr.OFTInteger:
+            type = ogr.OFTReal
         if type == ogr.OFTStringList or \
             type == ogr.OFTIntegerList or \
             type == ogr.OFTRealList or \
@@ -145,15 +147,15 @@ def create_fields(src_layer, dst_layer):
         dst_layer.CreateField( new )
     return
 
-def merge_datasets( input_datasources, dst_path, prefix ):
+def merge_datasets( input_datasources, dst_path, options ):
         
     for feature_class in feature_classes.keys():
         geom_types = feature_classes[feature_class]
         generic_types = get_generic_types( geom_types )
         for gen_type in generic_types:
             filename = feature_class + '_' + gen_type + '.shp'
-            if prefix:
-                filename = prefix + filename
+            if options['prefix']:
+                filename = options['prefix'] + filename
             shapefile = os.path.join( dst_path, filename )
             if os.path.exists( shapefile ):
                 shape_drv.DeleteDataSource( shapefile )
@@ -169,7 +171,7 @@ def merge_datasets( input_datasources, dst_path, prefix ):
                     #    % ( ds.GetName(), feature_class ) )
                     continue
                 if not output_schema_created:
-                    create_fields( lyr, dest_shape_lyr )
+                    create_fields( lyr, dest_shape_lyr,  options['real_fields'])
                     output_schema_created = True
                 copy_data( ds, lyr, dest_shape_lyr, gen_type )
             shape_ds.Destroy()
@@ -210,6 +212,8 @@ def main():
     parser.add_argument('src_path', help='Source directory of S57 Files')
     parser.add_argument('dst_path', help='Output directory for created shapefiles')
     parser.add_argument("-p", "--prefix", help='Prefix to shapefile output name')
+    parser.add_argument("-r", "--real_fields", action="store_true", default=False, help='Converts all integer fields to real fields')
+    
     
     args = parser.parse_args()
     
@@ -219,6 +223,11 @@ def main():
     
     if not os.path.isdir( args.dst_path ):
         os.makedirs( args.dst_path )
+    
+    options = {
+        'prefix'      : args.prefix,
+        'real_fields' : args.real_fields
+    }
     
     input_files = glob.glob( os.path.join( args.src_path, '*.000' ) )
     
@@ -232,7 +241,7 @@ def main():
     )
     input_datasources = read_datasets( input_files )
     
-    merge_datasets( input_datasources, args.dst_path, args.prefix )
+    merge_datasets( input_datasources, args.dst_path, options )
 
 if __name__ == "__main__":
     main()
